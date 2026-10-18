@@ -143,7 +143,7 @@ public class ClipSourceService {
     void validatePlaylist(SafeMediaClient.Text text) {
         String playlist = text.body();
         if (!playlist.startsWith("#EXTM3U") || !playlist.contains("#EXT-X-MAP:") || !playlist.contains("#EXT-X-ENDLIST")
-                || playlist.contains("#EXT-X-STREAM-INF:") || Pattern.compile("(?m)^#EXT-X-DISCONTINUITY\\s*$").matcher(playlist).find() || playlist.contains("#EXT-X-SESSION-KEY")) throw ClipSourceException.unsupported();
+                || playlist.contains("#EXT-X-STREAM-INF:") || playlist.contains("#EXT-X-SESSION-KEY")) throw ClipSourceException.unsupported();
         for (String raw : playlist.split("\\R")) {
             String line = raw.trim();
             if (line.startsWith("#EXT-X-KEY:") && !"NONE".equals(attributes(line).get("METHOD"))) throw ClipSourceException.unsupported();
