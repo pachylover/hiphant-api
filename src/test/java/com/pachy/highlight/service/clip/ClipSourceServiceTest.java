@@ -44,6 +44,19 @@ class ClipSourceServiceTest {
         for (String playlist : new String[]{"#EXTM3U\n#EXTINF:6,\na.ts\n#EXT-X-ENDLIST", PLAYLIST.replace("#EXT-X-ENDLIST", ""), PLAYLIST + "#EXT-X-KEY:METHOD=AES-128,URI=\"key\""})
             assertThatThrownBy(() -> service.validatePlaylist(new SafeMediaClient.Text(URI.create("https://media.example/vod.m3u8"), playlist))).isInstanceOf(ClipSourceException.class);
     }
+    @Test void acceptsDiscontinuitiesAndChecksEveryInitializationMapHost() {
+        String playlist = PLAYLIST.replace("#EXTINF:6,", "#EXT-X-DISCONTINUITY\n#EXTINF:6,")
+                .replace("#EXT-X-ENDLIST", "#EXT-X-DISCONTINUITY\n#EXT-X-MAP:URI=\"next-init.mp4\"\n#EXTINF:6,\nnext.m4s\n#EXT-X-ENDLIST");
+        assertThatCode(() -> service.validatePlaylist(new SafeMediaClient.Text(URI.create("https://media.example/vod.m3u8"), playlist)))
+                .doesNotThrowAnyException();
+        verify(media).validate("https://media.example/init.mp4");
+        verify(media).validate("https://media.example/next-init.mp4");
+        SafeMediaClient client = new SafeMediaClient("media.example");
+        ClipSourceService real = new ClipSourceService(client, new ObjectMapper());
+        assertThatThrownBy(() -> real.validatePlaylist(new SafeMediaClient.Text(URI.create("https://media.example/vod.m3u8"),
+                playlist.replace("next-init.mp4", "https://evil.example/init.mp4"))))
+                .extracting("code").isEqualTo("DOWNLOAD_HOST_NOT_ALLOWED");
+    }
     @Test void checksEveryManifestAssetHost() {
         SafeMediaClient client = new SafeMediaClient("media.example");
         ClipSourceService real = new ClipSourceService(client, new ObjectMapper());
