@@ -29,6 +29,7 @@ public class BlockedUserService {
 
     private final BlockedUserRepository blockedUserRepository;
     private final ChatRepository chatRepository;
+    private final com.pachy.highlight.repository.HighlightRepository highlightRepository;
 
     private final Set<String> cachedUids = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean cacheLoaded = new AtomicBoolean(false);
@@ -57,6 +58,7 @@ public class BlockedUserService {
     @Transactional
     public BlockedUser block(String uid, String nickname, String memo) {
         String trimmed = uid.trim();
+        highlightRepository.deleteBySourceChatUserId(trimmed);
         int deleted = chatRepository.deleteByUserId(trimmed);
 
         BlockedUser saved = blockedUserRepository.findByUid(trimmed)

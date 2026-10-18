@@ -14,6 +14,19 @@ import java.util.List;
 public interface HighlightRepository extends JpaRepository<Highlight, Long> {
   List<Highlight> findAllByVideoIdOrderByChatCountDesc(String videoId);
 
+  java.util.Optional<Highlight> findBySourceChatId(Long sourceChatId);
+
+  List<Highlight> findByVideoIdAndKeywordAndHighlightTypeOrderByChatCountDescMinuteAsc(
+          String videoId, String keyword, String highlightType);
+
+  @Query(value = "SELECT count(*) FROM pg_advisory_xact_lock(hashtextextended(:lockKey, 0))", nativeQuery = true)
+  long lockKeyword(@Param("lockKey") String lockKey);
+
+  @Modifying
+  @Query(value = "DELETE FROM highlights WHERE source_chat_id IN " +
+          "(SELECT id FROM chats WHERE user_id = :userId)", nativeQuery = true)
+  int deleteBySourceChatUserId(@Param("userId") String userId);
+
   // 최근 생성된 하이라이트 (관리자 대시보드)
   List<Highlight> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

@@ -24,6 +24,12 @@ public class Highlight {
     private String videoId;
 
     // 치지직 다시보기 제목. 생성 시점에 채워지며, 과거 데이터는 배치로 백필된다.
+    @Column(name = "keyword")
+    private String keyword;
+
+    @Column(name = "source_chat_id")
+    private Long sourceChatId;
+
     @Column(name = "video_title")
     private String videoTitle;
 
@@ -89,6 +95,7 @@ public class Highlight {
                 .chatCount(chatCount)
                 .title(title)
                 .summary(summary)
+                .keyword(keyword)
                 .highlightType(highlightType)
                 .build();
     }

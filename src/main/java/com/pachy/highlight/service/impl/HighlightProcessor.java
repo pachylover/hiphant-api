@@ -19,7 +19,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -170,8 +169,8 @@ public class HighlightProcessor {
     }
 
     /** 하이라이트에 함께 저장할 영상/채널 정보. 조회 실패 시 모든 값이 null 이다. */
-    record VideoMeta(String title, String channelId, String channelName) {
-        static final VideoMeta EMPTY = new VideoMeta(null, null, null);
+    record VideoMeta(String title, String channelId, String channelName, Integer durationSeconds) {
+        static final VideoMeta EMPTY = new VideoMeta(null, null, null, null);
     }
 
     private VideoMeta resolveMeta(String videoId) {
@@ -184,7 +183,8 @@ public class HighlightProcessor {
             ChzzkVideoResponse.Channel channel = info.getChannel();
             return new VideoMeta(title,
                     channel != null ? channel.getChannelId() : null,
-                    channel != null ? channel.getChannelName() : null);
+                    channel != null ? channel.getChannelName() : null,
+                    info.getDuration());
         } catch (Exception e) {
             log.warn("영상 정보 조회 실패 - videoId: {}", videoId, e);
             return VideoMeta.EMPTY;
@@ -219,8 +219,8 @@ public class HighlightProcessor {
         for (Object[] row : peakRows) {
             if (row == null || row.length < 3 || row[1] == null) continue;
 
-            Long minuteEpoch = toEpochMillis(row[1]);
-            if (minuteEpoch == null) continue;
+            Long minuteMs = toOffsetMillis(row[1]);
+            if (minuteMs == null) continue;
 
             Object cntObj = row[2];
             Number cnt = cntObj instanceof Number ? (Number) cntObj : null;
@@ -230,11 +230,12 @@ public class HighlightProcessor {
             h.setVideoTitle(meta.title());
             h.setChannelId(meta.channelId());
             h.setChannelName(meta.channelName());
-            h.setMinute(minuteEpoch);
+            h.setMinute(minuteMs);
             h.setChatCount(cnt != null ? cnt.intValue() : 0);
             h.setTitle(cnt != null ? String.format(titleFormat, cnt.intValue()) : "하이라이트");
-            h.setStartTs(minuteEpoch - Duration.ofSeconds(30).toMillis());
-            h.setEndTs(minuteEpoch + Duration.ofSeconds(90).toMillis());
+            ClipBounds clipBounds = calculateClipBounds(minuteMs, meta.durationSeconds());
+            h.setStartTs(clipBounds.startMs());
+            h.setEndTs(clipBounds.endMs());
             h.setStatus("DONE");
             h.setHighlightType(highlightType);
             highlightRepository.save(h);
@@ -244,18 +245,27 @@ public class HighlightProcessor {
         return created;
     }
 
-    /** minute 컬럼은 bigint(epoch millis) 지만 드라이버가 다른 타입을 줄 수 있어 방어적으로 변환한다. */
-    private Long toEpochMillis(Object minuteObj) {
+    /** minute 컬럼은 영상 기준 상대 밀리초다. */
+    private Long toOffsetMillis(Object minuteObj) {
         if (minuteObj instanceof Number n) return n.longValue();
-        if (minuteObj instanceof Timestamp t) return t.toInstant().toEpochMilli();
-        if (minuteObj instanceof java.time.OffsetDateTime o) return o.toInstant().toEpochMilli();
-        if (minuteObj instanceof java.time.LocalDateTime l) {
-            return l.atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli();
-        }
-        if (minuteObj instanceof java.time.Instant i) return i.toEpochMilli();
         if (minuteObj instanceof Object[] inner && inner.length > 0 && inner[0] instanceof Number n) {
             return n.longValue();
         }
         return null;
+    }
+
+    record ClipBounds(long startMs, long endMs) {}
+
+    static ClipBounds calculateClipBounds(long minuteMs, Integer durationSeconds) {
+        long startMs = Math.max(0L, minuteMs - Duration.ofSeconds(30).toMillis());
+        long endMs = Math.max(startMs + 1L, minuteMs + Duration.ofSeconds(90).toMillis());
+
+        if (durationSeconds != null && durationSeconds > 0) {
+            long durationMs = Duration.ofSeconds(durationSeconds.longValue()).toMillis();
+            startMs = Math.min(startMs, Math.max(0L, durationMs - 1L));
+            endMs = Math.min(Math.max(startMs + 1L, endMs), durationMs);
+        }
+
+        return new ClipBounds(startMs, endMs);
     }
 }
