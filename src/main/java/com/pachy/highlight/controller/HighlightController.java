@@ -27,6 +27,16 @@ public class HighlightController {
     private final HighlightService highlightService;
     private final HighlightRepository highlightRepository;
     private final ProgressService progressService;
+    private final com.pachy.highlight.service.impl.ChatHighlightService chatHighlightService;
+    private final com.pachy.highlight.service.impl.KeywordHighlightService keywordHighlightService;
+
+    public record KeywordRequest(String keyword) {}
+
+    @PostMapping("/{videoId}/keywords")
+    public ResponseEntity<List<HighlightResponse>> createFromKeyword(
+            @PathVariable("videoId") String videoId, @RequestBody KeywordRequest request) {
+        return ResponseEntity.ok(keywordHighlightService.create(videoId, request.keyword()));
+    }
 
     // 공개 홈용: 최근 생성된 하이라이트 (영상별 최신 1건, 기본 6건)
     @GetMapping("/recent")
@@ -98,13 +108,27 @@ public class HighlightController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/{videoId}/chats/{chatId}")
+    public ResponseEntity<HighlightResponse> createFromChat(
+            @PathVariable("videoId") String videoId, @PathVariable("chatId") Long chatId) {
+        return ResponseEntity.ok(chatHighlightService.create(videoId, chatId));
+    }
+
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<?> handleChatHighlightError(org.springframework.web.server.ResponseStatusException ex) {
+        return ResponseEntity.status(ex.getStatusCode())
+                .body(java.util.Map.of("message", ex.getReason() != null ? ex.getReason() : "Invalid request"));
+    }
+
     @PostMapping("/{id}")
     public ResponseEntity<Response> create(@PathVariable("id") String videoId,
                                            @RequestParam(value = "type", required = false) String highlightType) {
         Response response = new Response();
 
         // 이미 하이라이트가 존재하는 경우 400 응답
-        if (!highlightService.getHighlight(videoId).isEmpty()) {
+        if (highlightService.getHighlight(videoId).stream()
+                .anyMatch(highlight -> !"CHAT".equals(highlight.getHighlightType())
+                        && !"KEYWORD".equals(highlight.getHighlightType()))) {
             response.setResultCode(HttpStatus.BAD_REQUEST.value());
             response.setResultMsg("Highlight already exists for this video");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);

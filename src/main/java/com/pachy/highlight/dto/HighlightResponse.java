@@ -21,5 +21,6 @@ public class HighlightResponse {
     private String title;
     private String summary;
     private String highlightType;
+    private String keyword;
     private List<Object> chatSnippet;
 }
