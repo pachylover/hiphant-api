@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 /** Small control-plane requests only; DNS answers used for the connection are checked. */
 @Component
 public class SafeMediaClient {
+    // Long, finalized HLS playlists can exceed 2 MiB. Keep a finite control-plane cap.
+    static final int MAX_TEXT_BYTES = 16 * 1024 * 1024;
     private final Set<String> hosts;
     private final WebClient client;
     @org.springframework.beans.factory.annotation.Autowired
@@ -60,7 +62,7 @@ public class SafeMediaClient {
                 });
         return WebClient.builder().clientConnector(new ReactorClientHttpConnector(http))
                 .defaultHeader("User-Agent", userAgent)
-                .codecs(c -> c.defaultCodecs().maxInMemorySize(2 * 1024 * 1024)).build();
+                .codecs(c -> c.defaultCodecs().maxInMemorySize(MAX_TEXT_BYTES)).build();
     }
     static List<InetAddress> resolvePublic(String name) throws Exception {
         List<InetAddress> addresses = List.of(InetAddress.getAllByName(name));
@@ -118,6 +120,12 @@ public class SafeMediaClient {
                     }).block(Duration.ofSeconds(15));
         } catch (ClipSourceException e) { throw e; }
         catch (RuntimeException e) {
+            // Decoder errors may be wrapped; expose only a stable code, never the cause text.
+            for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                if (cause instanceof org.springframework.core.io.buffer.DataBufferLimitException)
+                    throw new ClipSourceException(502, "MEDIA_METADATA_TOO_LARGE", "영상 메타데이터가 지원 용량을 초과합니다.");
+                if (cause == cause.getCause()) break;
+            }
             // Never propagate client exception text: it can contain signed URLs.
             throw new ClipSourceException(502, "MEDIA_NETWORK_ERROR", "미디어 정보를 불러오지 못했습니다. 다시 시도해 주세요.");
         }
