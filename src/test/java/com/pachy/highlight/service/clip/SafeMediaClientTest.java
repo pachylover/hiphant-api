@@ -54,14 +54,26 @@ class SafeMediaClientTest {
     }
     @Test void limitsDecodedResponseBytes() {
         var strategies = org.springframework.web.reactive.function.client.ExchangeStrategies.builder()
-                .codecs(c -> c.defaultCodecs().maxInMemorySize(2 * 1024 * 1024)).build();
+                .codecs(c -> c.defaultCodecs().maxInMemorySize(SafeMediaClient.MAX_TEXT_BYTES)).build();
         var web = org.springframework.web.reactive.function.client.WebClient.builder().exchangeFunction(request ->
                 reactor.core.publisher.Mono.just(org.springframework.web.reactive.function.client.ClientResponse
                         .create(org.springframework.http.HttpStatus.OK, strategies)
                         .body(reactor.core.publisher.Flux.just(new org.springframework.core.io.buffer.DefaultDataBufferFactory()
-                                .wrap(new byte[2 * 1024 * 1024 + 1]))).build())).build();
+                                .wrap(new byte[SafeMediaClient.MAX_TEXT_BYTES + 1]))).build())).build();
         assertThatThrownBy(() -> new SafeMediaClient("media.example", web).get("https://media.example/master.m3u8"))
-                .extracting("code").isEqualTo("MEDIA_NETWORK_ERROR");
+                .extracting("code").isEqualTo("MEDIA_METADATA_TOO_LARGE");
+    }
+    @Test void acceptsLongVodPlaylistOverEightMiB() {
+        String body = "#EXTM3U\n" + "# playlist metadata\n".repeat(500_000);
+        assertThat(body.length()).isGreaterThan(8 * 1024 * 1024);
+        var strategies = org.springframework.web.reactive.function.client.ExchangeStrategies.builder()
+                .codecs(c -> c.defaultCodecs().maxInMemorySize(SafeMediaClient.MAX_TEXT_BYTES)).build();
+        var web = org.springframework.web.reactive.function.client.WebClient.builder().exchangeFunction(request ->
+                reactor.core.publisher.Mono.just(org.springframework.web.reactive.function.client.ClientResponse
+                        .create(org.springframework.http.HttpStatus.OK, strategies)
+                        .body(reactor.core.publisher.Flux.just(new org.springframework.core.io.buffer.DefaultDataBufferFactory()
+                                .wrap(body.getBytes(java.nio.charset.StandardCharsets.UTF_8)))).build())).build();
+        assertThat(new SafeMediaClient("media.example", web).get("https://media.example/vod.m3u8").body()).isEqualTo(body);
     }
     @Test void sendsSessionOnlyOnInitialMetadataRequest() {
         var cookies = new java.util.ArrayList<String>();
