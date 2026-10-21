@@ -169,8 +169,8 @@ public class HighlightProcessor {
     }
 
     /** 하이라이트에 함께 저장할 영상/채널 정보. 조회 실패 시 모든 값이 null 이다. */
-    record VideoMeta(String title, String channelId, String channelName, Integer durationSeconds) {
-        static final VideoMeta EMPTY = new VideoMeta(null, null, null, null);
+    record VideoMeta(String title, String channelId, String channelName, Integer durationSeconds, String thumbnailImageUrl, String publishDate) {
+        static final VideoMeta EMPTY = new VideoMeta(null, null, null, null, null, null);
     }
 
     private VideoMeta resolveMeta(String videoId) {
@@ -184,7 +184,7 @@ public class HighlightProcessor {
             return new VideoMeta(title,
                     channel != null ? channel.getChannelId() : null,
                     channel != null ? channel.getChannelName() : null,
-                    info.getDuration());
+                    info.getDuration(), info.getThumbnailImageUrl(), info.getPublishDate());
         } catch (Exception e) {
             log.warn("영상 정보 조회 실패 - videoId: {}", videoId, e);
             return VideoMeta.EMPTY;
@@ -228,6 +228,8 @@ public class HighlightProcessor {
             Highlight h = new Highlight();
             h.setVideoId(videoId);
             h.setVideoTitle(meta.title());
+            h.setThumbnailImageUrl(meta.thumbnailImageUrl());
+            h.setPublishDate(meta.publishDate());
             h.setChannelId(meta.channelId());
             h.setChannelName(meta.channelName());
             h.setMinute(minuteMs);

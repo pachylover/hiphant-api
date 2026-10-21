@@ -33,6 +33,9 @@ public class Highlight {
     @Column(name = "video_title")
     private String videoTitle;
 
+    private String thumbnailImageUrl;
+    private String publishDate;
+
     // 스트리머(채널) 정보. 같은 스트리머의 다른 하이라이트를 묶어 보여주기 위해 저장한다.
     @Column(name = "channel_id")
     private String channelId;

@@ -74,7 +74,8 @@ public class VideoMetaBackfillRunner implements ApplicationRunner {
 
                     if (title != null || channelId != null) {
                         transactionTemplate.executeWithoutResult(status ->
-                                highlightRepository.updateVideoMeta(videoId, title, channelId, channelName));
+                                highlightRepository.updateVideoMeta(videoId, title, channelId, channelName,
+                                        info.getThumbnailImageUrl(), info.getPublishDate()));
                         filled++;
                     }
                 }

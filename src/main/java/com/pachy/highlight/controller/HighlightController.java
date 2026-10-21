@@ -11,6 +11,8 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import com.pachy.highlight.dto.HighlightResponse;
 import com.pachy.highlight.dto.admin.RecentHighlightItem;
 import com.pachy.highlight.dto.response.Response;
+import com.pachy.highlight.dto.response.PageResult;
+import org.springframework.data.domain.PageRequest;
 import com.pachy.highlight.dto.response.ResponseList;
 import com.pachy.highlight.entity.Highlight;
 import com.pachy.highlight.repository.HighlightRepository;
@@ -36,6 +38,31 @@ public class HighlightController {
     public ResponseEntity<List<HighlightResponse>> createFromKeyword(
             @PathVariable("videoId") String videoId, @RequestBody KeywordRequest request) {
         return ResponseEntity.ok(keywordHighlightService.create(videoId, request.keyword()));
+    }
+
+    @GetMapping
+    public PageResult<RecentHighlightItem> browse(
+            @RequestParam(value = "query", defaultValue = "") String query,
+            @RequestParam(value = "channelId", defaultValue = "") String channelId,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "12") int size) {
+        return PageResult.of(
+                highlightRepository.browseHighlights(query.trim(), channelId.trim(),
+                        PageRequest.of(Math.max(0, page), Math.clamp(size, 1, 48))),
+                RecentHighlightItem::from);
+    }
+
+    public record StreamerItem(String channelId, String channelName) {}
+
+    @GetMapping("/streamers")
+    public ResponseList<StreamerItem> streamers(
+            @RequestParam(value = "query", defaultValue = "") String query) {
+        var items = highlightRepository.searchStreamers(query.trim()).stream()
+                .map(h -> new StreamerItem(h.getChannelId(), h.getChannelName())).toList();
+        var response = new ResponseList<StreamerItem>(HttpStatus.OK);
+        response.setList(items);
+        response.setCount(items.size());
+        return response;
     }
 
     // 공개 홈용: 최근 생성된 하이라이트 (영상별 최신 1건, 기본 6건)

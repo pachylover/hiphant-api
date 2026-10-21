@@ -13,6 +13,8 @@ public class RecentHighlightItem {
     private Long id;
     private String videoId;
     private String videoTitle;
+    private String thumbnailImageUrl;
+    private String publishDate;
     private String channelId;
     private String channelName;
     private String title;
@@ -26,6 +28,8 @@ public class RecentHighlightItem {
                 .id(h.getId())
                 .videoId(h.getVideoId())
                 .videoTitle(h.getVideoTitle())
+                .thumbnailImageUrl(h.getThumbnailImageUrl())
+                .publishDate(h.getPublishDate())
                 .channelId(h.getChannelId())
                 .channelName(h.getChannelName())
                 .title(h.getTitle())
