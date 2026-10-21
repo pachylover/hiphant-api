@@ -1,6 +1,7 @@
 package com.pachy.highlight.repository;
 
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -32,8 +33,8 @@ public interface HighlightRepository extends JpaRepository<Highlight, Long> {
 
   // 공개 홈용: 영상별 최신 하이라이트 1건씩, 최근 생성 순 (중복 영상 제거)
   @Query(value = "SELECT * FROM (" +
-          "  SELECT DISTINCT ON (video_id) * FROM highlights ORDER BY video_id, created_at DESC" +
-          ") t ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
+          "  SELECT DISTINCT ON (video_id) * FROM highlights ORDER BY video_id, created_at DESC, id DESC" +
+          ") t ORDER BY created_at DESC, id DESC LIMIT :limit", nativeQuery = true)
   List<Highlight> findRecentDistinctVideoHighlights(@Param("limit") int limit);
 
   /**
@@ -43,15 +44,15 @@ public interface HighlightRepository extends JpaRepository<Highlight, Long> {
   @Query(value = "SELECT * FROM (" +
           "  SELECT DISTINCT ON (video_id) * FROM highlights " +
           "  WHERE channel_id = :channelId AND video_id <> :excludeVideoId " +
-          "  ORDER BY video_id, created_at DESC" +
-          ") t ORDER BY created_at DESC LIMIT :limit", nativeQuery = true)
+          "  ORDER BY video_id, created_at DESC, id DESC" +
+          ") t ORDER BY created_at DESC, id DESC LIMIT :limit", nativeQuery = true)
   List<Highlight> findChannelHighlights(@Param("channelId") String channelId,
                                         @Param("excludeVideoId") String excludeVideoId,
                                         @Param("limit") int limit);
 
   // 영상 제목/채널 정보가 아직 채워지지 않은 영상 ID 목록 (백필 대상)
   @Query(value = "SELECT DISTINCT video_id FROM highlights " +
-          "WHERE video_title IS NULL OR video_title = '' OR channel_id IS NULL",
+          "WHERE video_title IS NULL OR video_title = '' OR channel_id IS NULL OR channel_name IS NULL OR channel_name = '' OR thumbnail_image_url IS NULL OR publish_date IS NULL",
           nativeQuery = true)
   List<String> findVideoIdsMissingMeta();
 
@@ -61,12 +62,35 @@ public interface HighlightRepository extends JpaRepository<Highlight, Long> {
           "video_title = COALESCE(CAST(:title AS text), video_title), " +
           "channel_id = COALESCE(CAST(:channelId AS text), channel_id), " +
           "channel_name = COALESCE(CAST(:channelName AS text), channel_name), " +
+          "thumbnail_image_url = COALESCE(CAST(:thumbnail AS text), thumbnail_image_url), " +
+          "publish_date = COALESCE(CAST(:publishDate AS text), publish_date), " +
           "updated_at = now() WHERE video_id = :videoId",
           nativeQuery = true)
   int updateVideoMeta(@Param("videoId") String videoId,
                       @Param("title") String title,
                       @Param("channelId") String channelId,
-                      @Param("channelName") String channelName);
+                      @Param("channelName") String channelName,
+                      @Param("thumbnail") String thumbnail,
+                      @Param("publishDate") String publishDate);
+
+  @Query(value = "SELECT * FROM (SELECT DISTINCT ON (video_id) * FROM highlights " +
+          "ORDER BY video_id, created_at DESC, id DESC) h " +
+          "WHERE (:channelId = '' OR channel_id = :channelId) " +
+          "AND (:query = '' OR strpos(lower(channel_name), lower(:query)) > 0) " +
+          "ORDER BY created_at DESC, id DESC",
+          countQuery = "SELECT count(*) FROM (SELECT DISTINCT ON (video_id) * FROM highlights " +
+                  "ORDER BY video_id, created_at DESC, id DESC) h " +
+                  "WHERE (:channelId = '' OR channel_id = :channelId) " +
+                  "AND (:query = '' OR strpos(lower(channel_name), lower(:query)) > 0)", nativeQuery = true)
+  Page<Highlight> browseHighlights(
+          @Param("query") String query, @Param("channelId") String channelId, Pageable pageable);
+
+  @Query(value = "SELECT * FROM (SELECT DISTINCT ON (channel_id) * FROM highlights " +
+          "WHERE channel_id IS NOT NULL AND channel_id <> '' AND channel_name IS NOT NULL " +
+          "AND channel_name <> '' ORDER BY channel_id, created_at DESC, id DESC) h " +
+          "WHERE (:query = '' OR strpos(lower(channel_name), lower(:query)) > 0) " +
+          "ORDER BY lower(channel_name), channel_id LIMIT 20", nativeQuery = true)
+  List<Highlight> searchStreamers(@Param("query") String query);
 
   // 통계
   @Query(value = "SELECT count(DISTINCT video_id) FROM highlights", nativeQuery = true)

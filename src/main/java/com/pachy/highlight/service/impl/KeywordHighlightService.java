@@ -57,6 +57,8 @@ public class KeywordHighlightService {
             Highlight highlight = Highlight.builder()
                     .videoId(videoId).keyword(keyword).minute(minute)
                     .videoTitle(info != null ? info.getVideoTitle() : null)
+                    .thumbnailImageUrl(info != null ? info.getThumbnailImageUrl() : null)
+                    .publishDate(info != null ? info.getPublishDate() : null)
                     .channelId(channel != null ? channel.getChannelId() : null)
                     .channelName(channel != null ? channel.getChannelName() : null)
                     .startTs(bounds.startMs()).endTs(bounds.endMs()).chatCount(count)
