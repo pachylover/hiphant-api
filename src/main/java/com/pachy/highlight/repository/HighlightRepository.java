@@ -89,7 +89,7 @@ public interface HighlightRepository extends JpaRepository<Highlight, Long> {
           "WHERE channel_id IS NOT NULL AND channel_id <> '' AND channel_name IS NOT NULL " +
           "AND channel_name <> '' ORDER BY channel_id, created_at DESC, id DESC) h " +
           "WHERE (:query = '' OR strpos(lower(channel_name), lower(:query)) > 0) " +
-          "ORDER BY lower(channel_name), channel_id LIMIT 20", nativeQuery = true)
+          "ORDER BY created_at DESC, id DESC, channel_id LIMIT 20", nativeQuery = true)
   List<Highlight> searchStreamers(@Param("query") String query);
 
   // 통계

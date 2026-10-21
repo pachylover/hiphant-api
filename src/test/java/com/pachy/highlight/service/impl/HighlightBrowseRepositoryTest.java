@@ -48,6 +48,25 @@ class HighlightBrowseRepositoryTest {
     }
 
     @Test
+    void streamersAreOrderedByLatestHighlightWithStableTies() {
+        String marker = UUID.randomUUID().toString();
+        String firstChannel = "first-" + marker;
+        String secondChannel = "second-" + marker;
+        String thirdChannel = "third-" + marker;
+        save("old-" + marker, firstChannel, "가-" + marker, 1);
+        save("second-" + marker, secondChannel, "다-" + marker, 3);
+        save("latest-" + marker, firstChannel, "가-" + marker, 4);
+        save("tied-" + marker, thirdChannel, "나-" + marker, 4);
+        highlights.flush();
+
+        assertThat(highlights.searchStreamers(marker))
+                .extracting(Highlight::getChannelId)
+                .containsExactly(thirdChannel, firstChannel, secondChannel);
+        assertThat(highlights.searchStreamers("가-" + marker))
+                .extracting(Highlight::getChannelId).containsExactly(firstChannel);
+    }
+
+    @Test
     void metadataBackfillPersistsDisplayFieldsAndKeepsExistingValuesOnFailure() {
         String id = UUID.randomUUID().toString();
         save(id, null, null, 1);
